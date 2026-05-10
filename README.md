@@ -181,4 +181,8 @@ uvicorn agentic_ai_main:app --reload --port 8000
 
 The application will be available at **http://localhost:8000**. The chat interface is served at the root path `/`.
 
+Your Welcome agent is waiting for you. 
+You can also ask it how to prepare 
+for the lecture :-)
+
 
