@@ -12,6 +12,8 @@ Install
   - **macOS / Linux:** Python is typically available on `PATH` automatically after install
 - Create a [Google Cloud Platform](https://console.cloud.google.com) account if you don't already have one
 - Install [Google Cloud CLI](https://docs.cloud.google.com/sdk/docs/install-sdk) following the instructions in the link.
+- Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and make sure the Docker daemon is running before building or deploying container images
+- Create a [Hugging Face](https://huggingface.co/join) account if you don't already have one
 
 ## 2.1. Create a GCP project
 
