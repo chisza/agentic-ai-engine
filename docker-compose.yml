@@ -1,0 +1,25 @@
+services:
+
+  mcp-fetch:
+    build:
+      context: app/mcp_servers/fetch
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  critic-a2a:
+    build:
+      context: .
+      dockerfile: app/a2a_servers/critic/Dockerfile
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+    volumes:
+      - ${GOOGLE_APPLICATION_CREDENTIALS}:/tmp/gcp_credentials.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp_credentials.json
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-cas-ai-agents}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-europe-north1}
+      GOOGLE_GENAI_USE_VERTEXAI: "TRUE"
+      CRITIC_A2A_HOST: "localhost"
+      CRITIC_A2A_PORT: "8002"

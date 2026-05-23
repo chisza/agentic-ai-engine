@@ -10,6 +10,8 @@ from google.adk.agents import LlmAgent
 from google.adk.tools import AgentTool
 
 from app.agent_repo.greeting_agent import greeting_agent
+from app.agent_repo.summarizer_agent import summarizer_agent
+from app.agent_repo.stack_planner_team import pdf_to_markdown_coordinator
 
 """
 from app.context.artifacts.artifact_tools import save_artifact, load_artifact, list_artifacts
@@ -29,6 +31,18 @@ AGENT_REGISTRY: dict[str, dict] = {
         "label": "Welcome",
         "description": "Welcomes students and helps them get started.",
         "icon": "👋",
+    },
+    "summarizer_agent": {
+        "agent": summarizer_agent,
+        "label": "Summarizer",
+        "description": "Summarizes text provided by the user.",
+        "icon": "📝",
+    },
+    "pdf_to_markdown_coordinator": {
+        "agent": pdf_to_markdown_coordinator,
+        "label": "PDF to Markdown",
+        "description": "Converts PDF documents to Markdown with Mermaid diagrams.",
+        "icon": "📄",
     },
 }
 

@@ -87,8 +87,10 @@ function highlightAgent(agentId) {
   for (const li of agentListEl.children) {
     li.classList.toggle("active", li.dataset.agentId === agentId);
   }
-  // Show file upload only for the summarizer agent
-  uploadBtn.style.display = (agentId === "summarizer_agent") ? "" : "none";
+  // Show file upload for agents that support it; restrict to PDF for the PDF agent
+  var pdfAgents = ["summarizer_agent", "pdf_to_markdown_coordinator"];
+  uploadBtn.style.display = pdfAgents.includes(agentId) ? "" : "none";
+  fileInput.accept = (agentId === "pdf_to_markdown_coordinator") ? "application/pdf" : "";
 
   // Show / hide Artifacts tab based on agent capabilities
   var agentMeta = agents.find(function (a) { return a.id === agentId; });
@@ -430,8 +432,10 @@ function handleServerMessage(data) {
   // partial or final – stream into the agent bubble
   typingEl.classList.remove("visible");
 
-  if (!currentAgentBubble) {
-    currentAgentBubble = appendMessage("agent", friendlyAgentName(data.author), data.content, data.author);
+  var incomingAuthor = data.author || selectedAgentId;
+  if (!currentAgentBubble || currentAgentBubble.dataset.author !== incomingAuthor) {
+    currentAgentBubble = appendMessage("agent", friendlyAgentName(incomingAuthor), data.content, incomingAuthor);
+    currentAgentBubble.dataset.author = incomingAuthor;
   } else {
     var contentNode = currentAgentBubble.querySelector(".content");
     contentNode.innerHTML = renderMarkdown(data.content);

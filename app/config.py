@@ -68,11 +68,11 @@ RAG_CORPUS: str = os.getenv("RAG_CORPUS", "")
 # ---------------------------------------------------------------------------
 
 # URL of the critic agent's A2A Agent Card (used by the summarizer to connect).
-CRITIC_A2A_URL: str = os.getenv("CRITIC_A2A_URL", "http://localhost:8001/.well-known/agent.json")
+CRITIC_A2A_URL: str = os.getenv("CRITIC_A2A_URL", "http://localhost:8002/.well-known/agent.json")
 
-# Host and port for the critic A2A server itself.
+# Host and port for the critic A2A server itself (port 8001 is reserved for the MCP fetch server).
 CRITIC_A2A_HOST: str = os.getenv("CRITIC_A2A_HOST", "localhost")
-CRITIC_A2A_PORT: int = int(os.getenv("CRITIC_A2A_PORT", "8001"))
+CRITIC_A2A_PORT: int = int(os.getenv("CRITIC_A2A_PORT", "8002"))
 
 
 # ---------------------------------------------------------------------------
