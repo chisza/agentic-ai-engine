@@ -33,5 +33,6 @@ summarizer_agent = LlmAgent(
     model=config.DEFAULT_LLM_MODEL,
     description="Agent that summarizes text provided by the user.",
     instruction=summarizer_agent_INSTRUCTION,
-    tools=_tools
+    tools=_tools,
+    output_key="summarizer_agent_output",
 )

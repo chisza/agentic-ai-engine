@@ -88,9 +88,10 @@ function highlightAgent(agentId) {
     li.classList.toggle("active", li.dataset.agentId === agentId);
   }
   // Show file upload for agents that support it; restrict to PDF for the PDF agent
-  var pdfAgents = ["summarizer_agent", "pdf_to_markdown_coordinator"];
+  var pdfAgents = ["summarizer_agent", "pdf_to_markdown_coordinator", "pdf_converter_coordinator"];
   uploadBtn.style.display = pdfAgents.includes(agentId) ? "" : "none";
-  fileInput.accept = (agentId === "pdf_to_markdown_coordinator") ? "application/pdf" : "";
+  var pdfOnlyAgents = ["pdf_to_markdown_coordinator", "pdf_converter_coordinator"];
+  fileInput.accept = pdfOnlyAgents.includes(agentId) ? "application/pdf" : "";
 
   // Show / hide Artifacts tab based on agent capabilities
   var agentMeta = agents.find(function (a) { return a.id === agentId; });
@@ -403,20 +404,34 @@ function handleServerMessage(data) {
     return;
   }
 
+  if (data.type === "artifact_ready") {
+    var dlUrl = "/api/v1/artifacts/download?agent_id=" + encodeURIComponent(data.agent_id)
+                + "&filename=" + encodeURIComponent(data.filename);
+    var dlEl = document.createElement("div");
+    dlEl.className = "message system";
+    dlEl.innerHTML =
+      '<div class="message-body">'
+      + '<div class="author">System</div>'
+      + '<div class="content">📎 <a href="' + dlUrl + '" download="' + escapeHtml(data.filename) + '">'
+      + escapeHtml(data.filename) + '</a> is ready for download</div>'
+      + '</div>';
+    chatContainer.appendChild(dlEl);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    loadArtifacts();
+    switchSidebarTab("artifacts");
+    return;
+  }
+
   if (data.type === "done") {
     typingEl.classList.remove("visible");
     currentAgentBubble = null;
     sendBtn.disabled = false;
     userInput.disabled = false;
     userInput.focus();
-    // Refresh artifact list if currently viewing the artifacts panel
-    if (panelArtifacts.style.display !== "none") {
-      loadArtifacts();
-    }
-    // Refresh memory list if currently viewing the memory panel
-    if (panelMemory.style.display !== "none") {
-      loadMemories();
-    }
+
+    // Refresh open panels
+    if (panelArtifacts.style.display !== "none") loadArtifacts();
+    if (panelMemory.style.display !== "none") loadMemories();
     return;
   }
 

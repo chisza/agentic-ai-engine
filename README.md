@@ -177,6 +177,11 @@ Required variables:
 
 ## 6. Run the Application locally
 
+Start the MCP server and the critic server
+```bash
+docker compose up # --build if necessary
+```
+
 ```bash
 uvicorn agentic_ai_main:app --reload --port 8000
 ```

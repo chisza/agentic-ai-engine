@@ -11,7 +11,7 @@ from google.adk.tools import AgentTool
 
 from app.agent_repo.greeting_agent import greeting_agent
 from app.agent_repo.summarizer_agent import summarizer_agent
-from app.agent_repo.stack_planner_team import pdf_to_markdown_coordinator
+from app.agent_repo.pdf_converter_team import pdf_converter_coordinator
 
 """
 from app.context.artifacts.artifact_tools import save_artifact, load_artifact, list_artifacts
@@ -38,11 +38,12 @@ AGENT_REGISTRY: dict[str, dict] = {
         "description": "Summarizes text provided by the user.",
         "icon": "📝",
     },
-    "pdf_to_markdown_coordinator": {
-        "agent": pdf_to_markdown_coordinator,
-        "label": "PDF to Markdown",
-        "description": "Converts PDF documents to Markdown with Mermaid diagrams.",
-        "icon": "📄",
+    "pdf_converter_coordinator": {
+        "agent": pdf_converter_coordinator,
+        "label": "PDF Converter",
+        "description": "Converts a PDF with text, code, images, and diagrams into Markdown.",
+        "icon": "🗂️",
+        "has_artifacts": True,
     },
 }
 
@@ -61,7 +62,7 @@ def list_agents() -> list[dict]:
             "label": meta["label"],
             "description": meta["description"],
             "icon": meta["icon"],
-            #"has_artifacts": has_artifact_tools(meta["agent"]),
+            "has_artifacts": meta.get("has_artifacts", False),
             #"has_memory": has_memory_tools(meta["agent"]),
             #"has_rag": has_rag_tools(meta["agent"]),
         }

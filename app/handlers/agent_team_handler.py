@@ -1,6 +1,8 @@
 """Handler for agent team management and orchestration."""
 
+import json
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 import structlog
 
@@ -24,6 +26,7 @@ class AgentTeamHandler:
         self.session_id: str | None = None
         self.runner: Runner | None = None
         self.agent_id: str | None = None
+        self._app_name: str | None = None
 
     async def create_agent_team_runner(self, agent_id: str) -> str:
         """Set up a runner for *agent_id*, reusing any existing session."""
@@ -38,6 +41,7 @@ class AgentTeamHandler:
 
             self.session_id = session.id
             self.agent_id = agent_id
+            self._app_name = agent_app.name
 
             runner_kwargs = dict(
                 app=agent_app,
@@ -198,7 +202,11 @@ class AgentTeamHandler:
                 session_id=self.session_id,
                 new_message=user_message,
             ):
-                # Extract text from event content parts
+                # Only surface events from the root agent — sub-agent
+                # communication is internal and not shown to the user.
+                if event.author != self.agent_id:
+                    continue
+
                 if event.content and event.content.parts:
                     text = "".join(
                         part.text for part in event.content.parts if part.text
@@ -209,6 +217,67 @@ class AgentTeamHandler:
                             "author": event.author or "agent",
                             "content": text,
                         }
+
+            session = await self._session_handler.service.get_session(
+                app_name=self._app_name,
+                user_id=config.USER_ID,
+                session_id=self.session_id,
+            )
+            if session is not None:
+                logger.info(
+                    "Session snapshot after turn",
+                    session_id=session.id,
+                    app_name=session.app_name,
+                    user_id=session.user_id,
+                    last_update_time=session.last_update_time,
+                    state=dict(session.state),
+                    event_count=len(session.events),
+                )
+                logger.info(
+                    "Session events:\n"
+                    + json.dumps(
+                        [e.model_dump() for e in session.events],
+                        indent=2,
+                        default=str,
+                    )
+                )
+
+                saved_file = session.state.get("last_saved_file")
+                final_markdown = session.state.get("final_markdown")
+                logger.info(
+                    "Artifact check after turn",
+                    last_saved_file=saved_file,
+                    has_final_markdown=bool(final_markdown),
+                    agent_id=self.agent_id,
+                )
+
+                # Fallback: if the mermaid callback didn't save the artifact
+                # (e.g. output_key state write races with after_agent_callback),
+                # save it here from the session state directly.
+                if final_markdown and not saved_file:
+                    _artifact = Part(
+                        inline_data={
+                            "mime_type": "text/markdown",
+                            "data": final_markdown.encode("utf-8"),
+                        }
+                    )
+                    await artifact_service_handler.service.save_artifact(
+                        app_name=self._app_name,
+                        user_id=config.USER_ID,
+                        session_id=self.session_id,
+                        filename="converted_output.md",
+                        artifact=_artifact,
+                    )
+                    saved_file = "converted_output.md"
+                    logger.info("Saved artifact from handler (callback fallback)")
+
+                if saved_file or final_markdown:
+                    filename = Path(saved_file).name if saved_file else "converted_output.md"
+                    yield {
+                        "type": "artifact_ready",
+                        "filename": filename,
+                        "agent_id": self.agent_id,
+                    }
 
         except Exception as e:
             logger.error("Streaming error", error=str(e))

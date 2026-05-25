@@ -11,4 +11,5 @@ greeting_agent = LlmAgent(
     model=config.DEFAULT_LLM_MODEL,
     description="Agent that greets users and answers basic questions about itself.",
     instruction=GREETING_AGENT_INSTRUCTION,
+    output_key="greeting_agent_output",
 )
