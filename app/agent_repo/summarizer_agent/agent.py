@@ -19,12 +19,14 @@ from app.context.memory.memory_tools import memorize_session, save_summary_to_me
 
 _critic_remote_agent = RemoteA2aAgent(
     name="critic_agent",
-    agent_card="http://localhost:8002/.well-known/agent-card.json",
+    agent_card=config.CRITIC_A2A_URL,
     description=(
         "Evaluates a summary against the original content and returns a structured score "
         "across completeness, conciseness, accuracy, and clarity (each out of 10)."
     ),
 )
+
+_mcp_url = config.MCP_FETCH_URL or "http://localhost:8001/sse"
 
 _tools = [
     preload_memory,
@@ -36,7 +38,7 @@ _tools = [
     list_artifact_store_contents,
     GoogleSearchAgentTool(agent=create_google_search_agent(config.DEFAULT_LLM_MODEL)),
     McpToolset(
-        connection_params=SseConnectionParams(url="http://localhost:8001/sse"),
+        connection_params=SseConnectionParams(url=_mcp_url),
         tool_filter=["fetch"],
     ),
     AgentTool(agent=_critic_remote_agent),

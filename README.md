@@ -192,4 +192,104 @@ Your Welcome agent is waiting for you.
 You can also ask it how to prepare 
 for the lecture :-)
 
+## 7. Deploy to the Cloud
 
+1. Enable required APIs
+    ```bash
+    gcloud services enable \
+    run.googleapis.com \
+    cloudbuild.googleapis.com \
+    artifactregistry.googleapis.com \
+    aiplatform.googleapis.com \
+    storage.googleapis.com
+    ```
+2. One-time infrastructure setup
+    ```bash
+    PROJECT_ID=cas-ai-agents
+    PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+  
+    # Artifact Registry repo for Docker images
+      gcloud artifacts repositories create agentic-ai \
+        --repository-format=docker \
+        --location=europe-north1 \
+        --project=$PROJECT_ID
+      
+      # Runtime service account
+      gcloud iam service-accounts create agentic-ai-sa \
+        --display-name="Agentic AI Engine SA" \
+        --project=$PROJECT_ID
+    
+      # Grant runtime permissions                                                                 
+      for ROLE in roles/aiplatform.user roles/storage.objectAdmin \
+                  roles/run.invoker roles/ml.developer; do
+        gcloud projects add-iam-policy-binding $PROJECT_ID \
+          --member="serviceAccount:agentic-ai-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+          --role="$ROLE"
+      done
+    
+      # Grant Cloud Build permission to deploy and set IAM policies                               
+      gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \
+        --role=roles/run.admin
+    
+      gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \                
+        --role=roles/iam.serviceAccountUser
+      
+      CLOUDBUILD_SA="858244425960-compute@developer.gserviceaccount.com" 
+      PROJECT_ID=cas-ai-agents
+    
+      # Allow Cloud Build to push to Artifact Registry
+      gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \
+        --role=roles/artifactregistry.writer
+      
+      CLOUDBUILD_SA="858244425960-compute@developer.gserviceaccount.com"
+      PROJECT_ID=cas-ai-agents
+    
+      # Storage access to read the uploaded source tarball
+      gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$CLOUDBUILD_SA" \
+        --role=roles/storage.objectAdmin                                                          
+    
+      # Deploy Cloud Run services
+      gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$CLOUDBUILD_SA" \
+        --role=roles/run.admin
+    
+      # Act as the runtime service account (agentic-ai-sa)
+      gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$CLOUDBUILD_SA" \
+        --role=roles/iam.serviceAccountUser
+    
+      # Push images to Artifact Registry
+      gcloud projects add-iam-policy-binding cas-ai-agents \
+        --member="serviceAccount:858244425960-compute@developer.gserviceaccount.com"  \
+        --role=roles/artifactregistry.writer
+
+    ```
+3. Authenticate Docker to Artifact Registry
+    ```bash
+    gcloud auth configure-docker europe-north1-docker.pkg.dev
+    ```
+4. Deploy via Cloud Build
+    ```bash
+    gcloud builds submit --config cloudbuild.yaml . --project=cas-ai-agents
+    ```
+5. Get the public URL
+    ```bash
+    gcloud run services describe agentic-ai-engine \
+    --region=europe-north1 \
+    --project=cas-ai-agents \
+    --format='value(status.url)'
+    ```
+6. Verify that all three services are running
+    ```bash
+    gcloud run services list --region=europe-north1 --project=cas-ai-agents
+    ```
+7. Shut down the services
+    ```bash
+    gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/agentic-ai-engine --quiet
+    gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/mcp-fetch --quiet
+    gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/critic-a2a --quiet
+    ```
