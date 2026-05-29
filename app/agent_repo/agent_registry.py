@@ -37,6 +37,8 @@ AGENT_REGISTRY: dict[str, dict] = {
         "label": "Summarizer",
         "description": "Summarizes text provided by the user.",
         "icon": "📝",
+        "has_memory": True,
+        "has_artifacts": True,
     },
     "pdf_converter_coordinator": {
         "agent": pdf_converter_coordinator,
@@ -63,8 +65,7 @@ def list_agents() -> list[dict]:
             "description": meta["description"],
             "icon": meta["icon"],
             "has_artifacts": meta.get("has_artifacts", False),
-            #"has_memory": has_memory_tools(meta["agent"]),
-            #"has_rag": has_rag_tools(meta["agent"]),
+            "has_memory": meta.get("has_memory", False),
         }
         for agent_id, meta in AGENT_REGISTRY.items()
     ]

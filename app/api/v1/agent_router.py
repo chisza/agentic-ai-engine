@@ -24,11 +24,12 @@ async def get_agents() -> dict:
 
 @agent_router.get("/artifacts")
 async def get_artifacts(agent_id: str = Query(..., description="Agent ID")) -> dict:
-    """Return all artifact filenames for the given agent's current session."""
+    """Return all artifact filenames for the given agent's current session plus user-store artifacts."""
     app_name = f"{agent_id}_app"
     session_id = session_handler._agent_session_mapping.get(agent_id)
     if not session_id:
         return {"artifacts": []}
+    # list_artifact_keys already includes user-namespace ("user:…") artifacts
     keys = await artifact_service_handler.service.list_artifact_keys(
         app_name=app_name,
         user_id=config.USER_ID,
@@ -37,15 +38,34 @@ async def get_artifacts(agent_id: str = Query(..., description="Agent ID")) -> d
     return {"artifacts": keys}
 
 
+@agent_router.get("/artifacts/store")
+async def get_artifact_store(agent_id: str = Query(..., description="Agent ID")) -> dict:
+    """Return only user-store (cross-session) artifacts for the given agent."""
+    app_name = f"{agent_id}_app"
+    keys = await artifact_service_handler.service.list_artifact_keys(
+        app_name=app_name,
+        user_id=config.USER_ID,
+        session_id=None,
+    )
+    store_keys = [k for k in keys if k.startswith("user:")]
+    return {"artifacts": store_keys}
+
+
 @agent_router.get("/artifacts/download")
 async def download_artifact(
     agent_id: str = Query(..., description="Agent ID"),
     filename: str = Query(..., description="Artifact filename"),
 ) -> Response:
-    """Download a single artifact by filename."""
+    """Download a single artifact by filename.
+
+    User-store artifacts (filename starting with ``user:``) are session-independent
+    and can be downloaded even without an active session.
+    """
     app_name = f"{agent_id}_app"
     session_id = session_handler._agent_session_mapping.get(agent_id)
-    if not session_id:
+
+    # User-store artifacts don't require a session
+    if not session_id and not filename.startswith("user:"):
         return Response(content="No session found", status_code=404)
 
     part = await artifact_service_handler.service.load_artifact(
