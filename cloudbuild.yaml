@@ -1,0 +1,235 @@
+# Cloud Build CI/CD pipeline — Agentic AI Engine
+#
+# Builds and deploys three Cloud Run services:
+#   1. mcp-fetch    (MCP fetch server — side-car)
+#   2. critic-a2a   (Critic A2A server — side-car)
+#   3. agentic-ai-engine (main FastAPI/WebSocket app)
+#
+# One-time setup (run once, not part of this pipeline):
+#   gcloud artifacts repositories create agentic-ai \
+#     --repository-format=docker --location=${_REGION}
+#
+#   gcloud iam service-accounts create agentic-ai-sa \
+#     --display-name="Agentic AI Engine runtime SA"
+#
+#   for ROLE in roles/aiplatform.user roles/storage.objectAdmin \
+#               roles/run.invoker roles/ml.developer; do
+#     gcloud projects add-iam-policy-binding $PROJECT_ID \
+#       --member="serviceAccount:agentic-ai-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+#       --role="$ROLE"
+#   done
+#
+#   # Allow Cloud Build to deploy Cloud Run services
+#   gcloud projects add-iam-policy-binding $PROJECT_ID \
+#     --member="serviceAccount:$(gcloud projects describe $PROJECT_ID \
+#       --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
+#     --role=roles/run.admin
+#   gcloud projects add-iam-policy-binding $PROJECT_ID \
+#     --member="serviceAccount:$(gcloud projects describe $PROJECT_ID \
+#       --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
+#     --role=roles/iam.serviceAccountUser
+#
+# Trigger this pipeline:
+#   gcloud builds submit --config cloudbuild.yaml .
+
+substitutions:
+  _REGION: europe-north1
+  _REPO: agentic-ai
+  _SA: agentic-ai-sa
+  _STORAGE_BUCKET: cas-ai-agents-858244425960
+  _DEFAULT_LLM_MODEL: gemini-2.5-flash
+  _AGENT_ENGINE_ID: ""
+  _MEMORY_BANK_LOCATION: us-central1
+  _MIN_INSTANCES: "1"
+  _MAX_INSTANCES: "10"
+  # _IMAGE_TAG defaults to "latest" for manual gcloud builds submit runs.
+  # Cloud Build triggers should override this with ${_IMAGE_TAG} for traceability.
+  _IMAGE_TAG: latest
+
+steps:
+
+  # ── Build all three images in parallel ──────────────────────────────────────
+
+  - id: build-main
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/agentic-ai-engine:${_IMAGE_TAG}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/agentic-ai-engine:latest
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/agentic-ai-engine:latest
+      - .
+    waitFor: ["-"]
+
+  - id: build-mcp
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/mcp-fetch:${_IMAGE_TAG}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/mcp-fetch:latest
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/mcp-fetch:latest
+      - app/mcp_servers/fetch
+    waitFor: ["-"]
+
+  - id: build-critic
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/critic-a2a:${_IMAGE_TAG}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/critic-a2a:latest
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/critic-a2a:latest
+      - --file
+      - app/a2a_servers/critic/Dockerfile
+      - .
+    waitFor: ["-"]
+
+  # ── Push all images ──────────────────────────────────────────────────────────
+
+  - id: push-main
+    name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/agentic-ai-engine"]
+    waitFor: [build-main]
+
+  - id: push-mcp
+    name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/mcp-fetch"]
+    waitFor: [build-mcp]
+
+  - id: push-critic
+    name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/critic-a2a"]
+    waitFor: [build-critic]
+
+  # ── Deploy MCP fetch server ──────────────────────────────────────────────────
+  # Runs as non-root (the mcp-fetch image uses python:3.12-slim default user).
+
+  - id: deploy-mcp
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    args:
+      - gcloud
+      - run
+      - deploy
+      - mcp-fetch
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/mcp-fetch:${_IMAGE_TAG}
+      - --region=${_REGION}
+      - --service-account=${_SA}@$PROJECT_ID.iam.gserviceaccount.com
+      - --allow-unauthenticated        # public URL — required so main app can reach it
+      - --ingress=all
+      - --port=8001
+      - --min-instances=1
+      - --max-instances=5
+      - --memory=512Mi
+      - --cpu=1
+      - --concurrency=100
+      - --timeout=60
+      - --quiet
+    waitFor: [push-mcp]
+
+  # ── Deploy Critic A2A server ─────────────────────────────────────────────────
+  # Runs as non-root (critic Dockerfile uses python:3.14-slim default user).
+
+  - id: deploy-critic
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    args:
+      - gcloud
+      - run
+      - deploy
+      - critic-a2a
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/critic-a2a:${_IMAGE_TAG}
+      - --region=${_REGION}
+      - --service-account=${_SA}@$PROJECT_ID.iam.gserviceaccount.com
+      - --allow-unauthenticated        # public URL — required so main app can reach it
+      - --ingress=all
+      - --port=8002
+      - --min-instances=1
+      - --max-instances=5
+      - --memory=1Gi
+      - --cpu=1
+      - --concurrency=20
+      - --timeout=120
+      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=${_REGION},GOOGLE_GENAI_USE_VERTEXAI=TRUE,CRITIC_A2A_HOST=0.0.0.0,CRITIC_A2A_PORT=8002
+      - --quiet
+    waitFor: [push-critic]
+
+  # ── Deploy main application ──────────────────────────────────────────────────
+  # Retrieves the public URLs of the two side-services, then deploys the main
+  # app with those URLs injected as environment variables.
+  # Runs as uid 1000 (appuser) — enforced in the Dockerfile.
+
+  - id: deploy-main
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+
+        # Retrieve stable public URLs assigned by Cloud Run
+        MCP_URL=$$(gcloud run services describe mcp-fetch \
+          --region=${_REGION} --project=$PROJECT_ID \
+          --format='value(status.url)')
+
+        CRITIC_URL=$$(gcloud run services describe critic-a2a \
+          --region=${_REGION} --project=$PROJECT_ID \
+          --format='value(status.url)')
+
+        echo "MCP URL:    $$MCP_URL"
+        echo "CRITIC URL: $$CRITIC_URL"
+
+        # Render service.yaml template and deploy via gcloud run services replace,
+        # then separately grant public (unauthenticated) access via IAM.
+        gcloud run deploy agentic-ai-engine \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/agentic-ai-engine:${_IMAGE_TAG} \
+          --region=${_REGION} \
+          --project=$PROJECT_ID \
+          --service-account=${_SA}@$PROJECT_ID.iam.gserviceaccount.com \
+          --allow-unauthenticated \
+          --ingress=all \
+          --port=8000 \
+          --min-instances=${_MIN_INSTANCES} \
+          --max-instances=${_MAX_INSTANCES} \
+          --memory=2Gi \
+          --cpu=2 \
+          --concurrency=80 \
+          --timeout=3600 \
+          --no-cpu-throttling \
+          --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,\
+        GOOGLE_CLOUD_LOCATION=${_REGION},\
+        GOOGLE_CLOUD_STORAGE_BUCKET=${_STORAGE_BUCKET},\
+        GOOGLE_GENAI_USE_VERTEXAI=TRUE,\
+        SESSION_BACKEND=VERTEX,\
+        DEFAULT_LLM_MODEL=${_DEFAULT_LLM_MODEL},\
+        AGENT_ENGINE_ID=${_AGENT_ENGINE_ID},\
+        MEMORY_BANK_LOCATION=${_MEMORY_BANK_LOCATION},\
+        MCP_FETCH_URL=$$MCP_URL/sse,\
+        CRITIC_A2A_URL=$$CRITIC_URL/.well-known/agent-card.json,\
+        LOG_LEVEL=INFO" \
+          --quiet
+
+        # Explicitly bind allUsers → roles/run.invoker so the URL is truly public.
+        # (--allow-unauthenticated sets this too, but being explicit makes audits clear.)
+        gcloud run services add-iam-policy-binding agentic-ai-engine \
+          --region=${_REGION} \
+          --project=$PROJECT_ID \
+          --member="allUsers" \
+          --role="roles/run.invoker"
+
+        echo "✓ Deployment complete."
+        echo "Service URL: $$(gcloud run services describe agentic-ai-engine \
+          --region=${_REGION} --project=$PROJECT_ID \
+          --format='value(status.url)')"
+    waitFor: [push-main, deploy-mcp, deploy-critic]
+
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # Use a faster machine for parallel image builds
+  machineType: E2_HIGHCPU_8

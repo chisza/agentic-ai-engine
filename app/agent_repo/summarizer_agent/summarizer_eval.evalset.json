@@ -1,0 +1,194 @@
+{
+  "eval_set_id": "summarizer_eval",
+  "name": "Summarizer Agent Evaluation",
+  "description": "Checks summarization quality, critic scoring, memory persistence, artifact export, and artifact store persistence.",
+  "eval_cases": [
+    {
+      "eval_id": "basic_text_summarization",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [
+              {
+                "text": "Please summarize the following text:\n\nMachine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed. It focuses on developing algorithms that can access data and use it to learn for themselves. The three main types are: supervised learning, which trains on labelled examples; unsupervised learning, which discovers patterns in unlabelled data; and reinforcement learning, which optimises behaviour through rewards."
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "## Summary"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "critic_agent",
+                "args": {}
+              },
+              {
+                "name": "save_summary_to_memory",
+                "args": {}
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "summarizer_agent",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "export_summary_as_pdf",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [
+              {
+                "text": "Summarize this: Cloud computing delivers computing services over the internet—servers, storage, databases, and software. Key benefits are cost savings via pay-as-you-go pricing, elastic scalability, and global reach. The three service models are IaaS (raw infrastructure), PaaS (development platform), and SaaS (ready-to-use applications)."
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "## Summary"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "critic_agent",
+                "args": {}
+              },
+              {
+                "name": "save_summary_to_memory",
+                "args": {}
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          }
+        },
+        {
+          "user_content": {
+            "parts": [
+              {
+                "text": "Save the summary as a PDF."
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "summary.pdf"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "save_summary_as_artifact",
+                "args": {
+                  "format": "pdf"
+                }
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "summarizer_agent",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "persist_to_artifact_store",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [
+              {
+                "text": "Summarize: Python is a high-level interpreted language created in 1991 by Guido van Rossum. It emphasises readability and simplicity, supports multiple paradigms including object-oriented and functional programming, and has a rich ecosystem used in web development, data science, automation, and AI."
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "## Summary"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "critic_agent",
+                "args": {}
+              },
+              {
+                "name": "save_summary_to_memory",
+                "args": {}
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          }
+        },
+        {
+          "user_content": {
+            "parts": [
+              {
+                "text": "Save this to the artifact store with the name python-overview in markdown format."
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "python-overview"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "save_summary_to_artifact_store",
+                "args": {
+                  "name": "python-overview",
+                  "format": "markdown"
+                }
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "summarizer_agent",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    }
+  ]
+}

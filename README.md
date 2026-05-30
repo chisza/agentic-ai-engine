@@ -293,3 +293,11 @@ for the lecture :-)
     gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/mcp-fetch --quiet
     gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/critic-a2a --quiet
     ```
+
+## 8. Testing
+
+```bash
+  PYTHONPATH=. adk eval \
+    app/agent_repo/summarizer_agent \
+    app/agent_repo/summarizer_agent/summarizer_eval.evalset.json
+```

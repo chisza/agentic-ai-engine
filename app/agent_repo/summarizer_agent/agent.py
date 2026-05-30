@@ -52,3 +52,7 @@ summarizer_agent = LlmAgent(
     tools=_tools,
     output_key="summarizer_agent_output",
 )
+
+# Required by `adk eval` (looks for agent_module.agent.root_agent)
+# and `adk web` (looks for root_agent in the package)
+root_agent = summarizer_agent
