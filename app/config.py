@@ -63,6 +63,10 @@ SESSION_BACKEND: str = os.getenv("SESSION_BACKEND", "VERTEX" if IS_CLOUD_RUN els
 # Format: projects/{project}/locations/{location}/ragCorpora/{id}
 RAG_CORPUS: str = os.getenv("RAG_CORPUS", "")
 
+# OpenTelemetry — enable GCP exporters (Cloud Trace + Cloud Monitoring).
+# Automatically True on Cloud Run; set TELEMETRY_ENABLED=true for local dev.
+TELEMETRY_ENABLED: bool = IS_CLOUD_RUN or os.getenv("TELEMETRY_ENABLED", "false").lower() in ("true", "1")
+
 # ---------------------------------------------------------------------------
 # A2A (Agent-to-Agent) settings — external critic agent
 # ---------------------------------------------------------------------------
