@@ -46,6 +46,7 @@ AGENT_REGISTRY: dict[str, dict] = {
         "description": "Converts a PDF with text, code, images, and diagrams into Markdown.",
         "icon": "🗂️",
         "has_artifacts": True,
+        "has_rag": True,
     },
 }
 
@@ -66,6 +67,7 @@ def list_agents() -> list[dict]:
             "icon": meta["icon"],
             "has_artifacts": meta.get("has_artifacts", False),
             "has_memory": meta.get("has_memory", False),
+            "has_rag": meta.get("has_rag", False),
         }
         for agent_id, meta in AGENT_REGISTRY.items()
     ]

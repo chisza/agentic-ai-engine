@@ -2,6 +2,9 @@
 
 This guide walks you through setting up a GCP account, the Google Cloud CLI, and the agentic AI application that we will extend throughout the lecture. Follow all steps in order. By the end you will have the application running locally — a greeting agent will be ready to answer your questions and help you prepare for the upcoming sessions.
 
+IMPORTANT: When you create the `.env` file from the example, change the port for the critic agent to port `8002`
+
+
 ## 1. Prerequisites
 
 Install
