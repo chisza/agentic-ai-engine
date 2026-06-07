@@ -105,7 +105,7 @@ gcloud storage buckets create gs://<BUCKET_NAME> \
   --uniform-bucket-level-access
 ```
 
-Replace `<BUCKET_NAME>` with a globally unique name (e.g. `agentic-ai-eng-<PROJECT_ID>`), then set it in `.env`:
+Replace `<BUCKET_NAME>` with a globally unique name (e.g. `agentic-ai-eng-<PROJECT_ID>`), then add it to `.env`:
 
 ```env
 GOOGLE_CLOUD_STORAGE_BUCKET=<BUCKET_NAME>
@@ -172,135 +172,123 @@ Copy the example and fill in your values:
 cp .env.example .env
 ```
 
-Required variables:
+Fill in the required values — and set the critic agent port to `8002`:
 
 - `GOOGLE_APPLICATION_CREDENTIALS` — path to your ADC credentials file
 - `GOOGLE_CLOUD_PROJECT` — your GCP project ID
 - `GOOGLE_CLOUD_STORAGE_BUCKET` — your Cloud Storage bucket name
+- `CRITIC_AGENT_PORT=8002`
 
 ## 6. Run the Application locally
 
-Start the MCP server and the critic server
+Start the supporting services (MCP server + critic agent):
+
 ```bash
-docker compose up # --build if necessary
+docker compose up
 ```
+
+**Option A — ADK Dev UI** (chat interface with eval support, recommended for development):
+
+```bash
+PYTHONPATH=. .venv/bin/adk web app/agent_repo --port 8085
+```
+
+Open **http://localhost:8085** and select an agent from the sidebar.
+
+**Option B — Custom app** (WebSocket chat UI):
 
 ```bash
 uvicorn agentic_ai_main:app --reload --port 8000
 ```
 
-The application will be available at **http://localhost:8000**. The chat interface is served at the root path `/`.
+Open **http://localhost:8000**.
 
-Your Welcome agent is waiting for you. 
-You can also ask it how to prepare 
-for the lecture :-)
+## 7. Evaluate
 
-## 7. Deploy to the Cloud
-
-1. Enable required APIs
-    ```bash
-    gcloud services enable \
-    run.googleapis.com \
-    cloudbuild.googleapis.com \
-    artifactregistry.googleapis.com \
-    aiplatform.googleapis.com \
-    storage.googleapis.com
-    ```
-2. One-time infrastructure setup
-    ```bash
-    PROJECT_ID=cas-ai-agents
-    PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
-  
-    # Artifact Registry repo for Docker images
-      gcloud artifacts repositories create agentic-ai \
-        --repository-format=docker \
-        --location=europe-north1 \
-        --project=$PROJECT_ID
-      
-      # Runtime service account
-      gcloud iam service-accounts create agentic-ai-sa \
-        --display-name="Agentic AI Engine SA" \
-        --project=$PROJECT_ID
-    
-      # Grant runtime permissions                                                                 
-      for ROLE in roles/aiplatform.user roles/storage.objectAdmin \
-                  roles/run.invoker roles/ml.developer; do
-        gcloud projects add-iam-policy-binding $PROJECT_ID \
-          --member="serviceAccount:agentic-ai-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-          --role="$ROLE"
-      done
-    
-      # Grant Cloud Build permission to deploy and set IAM policies                               
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \
-        --role=roles/run.admin
-    
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \                
-        --role=roles/iam.serviceAccountUser
-      
-      CLOUDBUILD_SA="858244425960-compute@developer.gserviceaccount.com" 
-      PROJECT_ID=cas-ai-agents
-    
-      # Allow Cloud Build to push to Artifact Registry
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \
-        --role=roles/artifactregistry.writer
-      
-      CLOUDBUILD_SA="858244425960-compute@developer.gserviceaccount.com"
-      PROJECT_ID=cas-ai-agents
-    
-      # Storage access to read the uploaded source tarball
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:$CLOUDBUILD_SA" \
-        --role=roles/storage.objectAdmin                                                          
-    
-      # Deploy Cloud Run services
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:$CLOUDBUILD_SA" \
-        --role=roles/run.admin
-    
-      # Act as the runtime service account (agentic-ai-sa)
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:$CLOUDBUILD_SA" \
-        --role=roles/iam.serviceAccountUser
-    
-      # Push images to Artifact Registry
-      gcloud projects add-iam-policy-binding cas-ai-agents \
-        --member="serviceAccount:858244425960-compute@developer.gserviceaccount.com"  \
-        --role=roles/artifactregistry.writer
-
-    ```
-3. Authenticate Docker to Artifact Registry
-    ```bash
-    gcloud auth configure-docker europe-north1-docker.pkg.dev
-    ```
-4. Deploy via Cloud Build
-    ```bash
-    gcloud builds submit --config cloudbuild.yaml . --project=cas-ai-agents
-    ```
-5. Get the public URL
-    ```bash
-    gcloud run services describe agentic-ai-engine \
-    --region=europe-north1 \
-    --project=cas-ai-agents \
-    --format='value(status.url)'
-    ```
-6. Verify that all three services are running
-    ```bash
-    gcloud run services list --region=europe-north1 --project=cas-ai-agents
-    ```
-7. Shut down the services
-    ```bash
-    gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/agentic-ai-engine --quiet
-    gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/mcp-fetch --quiet
-    gcloud artifacts docker images delete europe-north1-docker.pkg.dev/cas-ai-agents/agentic-ai/critic-a2a --quiet
-    ```
-
-## 8. Testing
+Run the greeting agent eval set:
 
 ```bash
-  PYTHONPATH=. adk eval \
-    app/agent_repo/summarizer_agent \
-    app/agent_repo/summarizer_agent/summarizer_eval.evalset.json
+PYTHONPATH=. .venv/bin/adk eval \
+  app/agent_repo/greeting_agent \
+  app/agent_repo/greeting_agent/greeting_eval.evalset.json
+```
+
+You can also run evals from the ADK Dev UI: select an agent, open the **Eval** tab, and click **Run**.
+
+## 8. Deploy to Cloud
+
+The following commands may have to be adapted to run in your environment.
+
+### 8.1 Enable required APIs
+
+```bash
+gcloud services enable \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  aiplatform.googleapis.com \
+  storage.googleapis.com
+```
+
+### 8.2 One-time infrastructure setup
+
+```bash
+PROJECT_ID=<project_id>
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+CLOUDBUILD_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+# Artifact Registry repo
+gcloud artifacts repositories create agentic-ai \
+  --repository-format=docker \
+  --location=europe-north1 \
+  --project=$PROJECT_ID
+
+# Runtime service account
+gcloud iam service-accounts create agentic-ai-sa \
+  --display-name="Agentic AI Engine SA" \
+  --project=$PROJECT_ID
+
+# Runtime permissions
+for ROLE in roles/aiplatform.user roles/storage.objectAdmin \
+            roles/run.invoker roles/ml.developer; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:agentic-ai-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="$ROLE"
+done
+
+# Cloud Build permissions
+for ROLE in roles/run.admin roles/iam.serviceAccountUser \
+            roles/artifactregistry.writer roles/storage.objectAdmin; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+    --role="$ROLE"
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$CLOUDBUILD_SA" \
+    --role="$ROLE"
+done
+```
+
+### 8.3 Deploy
+
+```bash
+gcloud auth configure-docker europe-north1-docker.pkg.dev
+gcloud builds submit --config cloudbuild.yaml . --project=$PROJECT_ID
+```
+
+### 8.4 Verify and manage
+
+```bash
+# Get the public URL
+gcloud run services describe agentic-ai-engine \
+  --region=europe-north1 \
+  --project=$PROJECT_ID \
+  --format='value(status.url)'
+
+# List all running services
+gcloud run services list --region=europe-north1 --project=$PROJECT_ID
+
+# Delete images to stop incurring costs
+gcloud artifacts docker images delete europe-north1-docker.pkg.dev/$PROJECT_ID/agentic-ai/agentic-ai-engine --quiet
+gcloud artifacts docker images delete europe-north1-docker.pkg.dev/$PROJECT_ID/agentic-ai/mcp-fetch --quiet
+gcloud artifacts docker images delete europe-north1-docker.pkg.dev/$PROJECT_ID/agentic-ai/critic-a2a --quiet
 ```

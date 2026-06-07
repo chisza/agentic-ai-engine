@@ -34,6 +34,19 @@ def _to_markdown_bytes(text: str) -> bytes:
     return text.encode("utf-8")
 
 
+_UNICODE_TO_ASCII = str.maketrans({
+    "—": "--",   # em dash
+    "–": "-",    # en dash
+    "‘": "'",    # left single quote
+    "’": "'",    # right single quote
+    "“": '"',    # left double quote
+    "”": '"',    # right double quote
+    "…": "...",  # ellipsis
+    "·": "-",    # middle dot
+    "•": "-",    # bullet
+})
+
+
 def _to_pdf_bytes(text: str) -> bytes:
     pdf = FPDF()
     pdf.add_page()
@@ -44,6 +57,9 @@ def _to_pdf_bytes(text: str) -> bytes:
     clean = re.sub(r"#{1,6}\s+", "", text)
     clean = re.sub(r"\*{1,2}(.+?)\*{1,2}", r"\1", clean)
     clean = re.sub(r"_{1,2}(.+?)_{1,2}", r"\1", clean)
+    # Replace Unicode typographic characters not supported by Helvetica (latin-1)
+    clean = clean.translate(_UNICODE_TO_ASCII)
+    clean = clean.encode("latin-1", errors="replace").decode("latin-1")
     pdf.multi_cell(0, 6, clean)
     return bytes(pdf.output())
 
